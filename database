@@ -1,0 +1,150 @@
+import psycopg2
+import configparser
+
+
+config = configparser.ConfigParser()
+config.read('settings.ini')
+password_postgres = config['Password']['postgres']
+
+# conn = psycopg2.connect(database="EnglishCard", user="postgres", password=password_postgres)
+def get_db_connection():
+    """Создаёт и возвращает подключение к базе данных."""
+    return psycopg2.connect(database="EnglishCard", user="postgres", password=password_postgres)
+
+
+"""Функция создает таблицы в базе данных и заполняет их начальными данными"""
+def initialize_db():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            #Таблица пользователей
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users(
+                    user_id SERIAL PRIMARY KEY NOT NULL UNIQUE,
+                    username VARCHAR(60) NOT NULL
+            );
+            """)
+
+            # Общий словарь
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS words(
+                    word_id SERIAL PRIMARY KEY NOT NULL UNIQUE,
+                    target_word VARCHAR(200) NOT NULL,
+                    translate_word VARCHAR(200) NOT NULL
+            );
+            """)
+
+            # Персональный словарь
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_words(
+                    user_words_id SERIAL PRIMARY KEY NOT NULL UNIQUE,
+                    user_id INTEGER REFERENCES users(user_id),
+                    target_word VARCHAR(200) NOT NULL,
+                    translate_word VARCHAR(200) NOT NULL
+            );
+            """)
+            conn.commit()
+"""Функция заполняет таблицу со словами"""
+def fill_words(set_of_words):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            for i in set_of_words:
+                cur.execute("""
+                INSERT into words(target_word, translate_word)
+                VALUES (%s, %s)
+                ;""", i)
+
+
+"""Функция получает случайные слова """
+def get_random_words(cid, limit=4):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+            SELECT target_word, translate_word
+              FROM (
+                SELECT w.target_word, w.translate_word
+                  FROM words w
+                 UNION
+                SELECT uw.target_word, uw.translate_word
+                  FROM user_words uw
+                 WHERE uw.user_id = %s
+                  ) AS combined_words
+                 ORDER BY RANDOM()
+                 LIMIT %s;
+            """, (cid, limit))
+            return cur.fetchall()
+
+
+
+
+"""Функция проверяет, существует ли пользователь в базе данных и создает его, если необходимо"""
+def check_user(user_id, username):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO users (user_id, username)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id) DO UPDATE
+            SET username = EXCLUDED.username
+            """, (user_id, username))
+
+            conn.commit()
+
+
+
+
+"""Функция проверяет, существует ли слово в общем словаре."""
+def check_word_existence(word):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+            SELECT 1
+            FROM words
+            WHERE target_word = %s;
+            """, (word,))
+            return cur.fetchone() is not None
+
+
+"""Сохраняет слово в персональный словарь."""
+def add_word_to_user(user_words_id, target_word, translation):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO user_words (user_words_id, target_word, translate_word)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id) DO NOTHING;
+            """, (user_words_id, target_word.strip().capitalize(), translation.strip().capitalize(), ))
+
+            conn.commit()
+
+
+
+
+"""Функция удаляет слово из персонального словаря"""
+def delete_user_word(user_id, word_to_delete):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM user_words
+                WHERE user_id = %s
+                AND target_word = %s
+                RETURNING target_word;
+            """, (user_id, word_to_delete, ))
+            return cur.fetchone()
+
+
+"""Обновляет персональный словарь."""
+def update_word_to_user_dict(user_id, target_word, translate_word):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO user_words (user_id, target_word, translate_word)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, target_word) DO NOTHING;
+            """, (user_id, target_word, translate_word,))
+        return cur.fetchone()
+
+get_db_connection()
+initialize_db()
+
+
+# conn.close()
