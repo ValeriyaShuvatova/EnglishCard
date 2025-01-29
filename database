@@ -1,5 +1,6 @@
 import psycopg2
 import configparser
+import sqlite3
 
 
 config = configparser.ConfigParser()
@@ -16,6 +17,9 @@ def get_db_connection():
 def initialize_db():
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute("""
+                DROP TABLE IF EXISTS words
+                """)
             #Таблица пользователей
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users(
@@ -75,18 +79,18 @@ def get_random_words(cid, limit=4):
 
 
 
-
 """Функция проверяет, существует ли пользователь в базе данных и создает его, если необходимо"""
+
 def check_user(user_id, username):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
             INSERT INTO users (user_id, username)
             VALUES (%s, %s)
-            ON CONFLICT (user_id) DO UPDATE
-            SET username = EXCLUDED.username
+            ON CONFLICT (user_id) DO UPDATE SET 
+            user_id = EXCLUDED.user_id, username = EXCLUDED.username;
             """, (user_id, username))
-
+            # return cur.fetchall()
             conn.commit()
 
 
@@ -97,7 +101,7 @@ def check_word_existence(word):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-            SELECT 1
+            SELECT target_word
             FROM words
             WHERE target_word = %s;
             """, (word,))
@@ -105,16 +109,38 @@ def check_word_existence(word):
 
 
 """Сохраняет слово в персональный словарь."""
-def add_word_to_user(user_words_id, target_word, translation):
+def add_word_to_user(user_id, target_word, translation):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO user_words (user_words_id, target_word, translate_word)
+            INSERT INTO user_words (user_id, target_word, translate_word)
             VALUES (%s, %s, %s)
-            ON CONFLICT (user_id) DO NOTHING;
-            """, (user_words_id, target_word.strip().capitalize(), translation.strip().capitalize(), ))
-
+            ON CONFLICT (user_id, target_word) DO NOTHING
+            """, (user_id, target_word.strip().capitalize(), translation.strip().capitalize()))
+            # return cur.fetchone()
             conn.commit()
+
+
+
+
+
+
+
+
+
+
+# """Сохраняет слово в персональный словарь."""
+# def add_word_to_user(user_id, target_word, translation):
+#     with get_db_connection() as conn:
+#         with conn.cursor() as cur:
+#             cur.execute("""
+#             INSERT INTO user_words (user_id, target_word, translate_word)
+#             VALUES (%s, %s, %s)
+#             ON CONFLICT (user_id) DO UPDATE SET
+#             user_id = EXCLUDED.user_id, target_word = EXCLUDED.target_word, translation = EXCLUDED.translate_word;
+#             """, (user_id, target_word, translation, ))
+#             # return cur.fetchone()
+#             conn.commit()
 
 
 
