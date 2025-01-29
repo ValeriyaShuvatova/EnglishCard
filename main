@@ -1,6 +1,8 @@
 import random
+import sqlite3
 import os
 import telebot
+from psycopg2 import connect
 from telebot import types, TeleBot, custom_filters
 from telebot.storage import StateMemoryStorage
 from telebot.handler_backends import State, StatesGroup
@@ -24,11 +26,12 @@ print('Start telegram bot...')
 
 
 state_storage = StateMemoryStorage()
-TOKEN = " "
+TOKEN = '8154783971:AAES0X7dPAXy2chPl1RCMlbBqI2ihQhEAUk'
 bot = TeleBot(TOKEN, state_storage=state_storage, skip_pending=True)
 
 
 # """Проверка существования пользователя"""
+#
 # check_user(user_id=bot.get_me().id, username=bot.get_me().username)
 
 buttons = []
@@ -85,14 +88,18 @@ fill_words(set_of_words)
 @bot.message_handler(commands = ["start"])
 def send_welcom(message):
     cid = message.chat.id
-    if cid not in known_users:
-        known_users.append(cid)
-        userStep[cid] = 0
-        user_id = message.from_user.id
-        username = message.from_user.username
-        check_user(user_id=user_id, username=username)
+    username = message.chat.username
+    user_id = message.from_user.id
+    # if user_id not in known_users:
+    #     known_users.append(user_id)
+    #     userStep[user_id] = 0
+
+    # username = message.from_user.username
+    check_user(user_id, username)
 
     print("Запускаю бота в первый раз...")
+    print(cid)
+    print(username)
     bot.send_message(cid, f"Привет!"
                     f"Давай попрактикуемся в английском языке.\nТренировки можешь проходить в удобном для себя темпе.\n"
                     f"У тебя есть возможность использовать тренажёр,\nкак конструктор, "
@@ -198,7 +205,7 @@ def add_translate_word(message):
 
 
     bot.send_message(cid, f"Теперь введите перевод для слова '{word}':")
-
+    # save_new_word(message)
 
 """Обрабатываем сообщение от пользователя в котором он написал ПЕРЕВОД нового слов для добавления в словарь"""
 
@@ -222,6 +229,7 @@ def save_new_word(message):
             return
 
         # Сохраняем новое слово в персональный словарь пользователя
+
         add_word_to_user(message.from_user.id, target_word, translation)
 
         bot.send_message(cid, f"Слово '{target_word}' и его перевод '{translation}' успешно добавлены!")
