@@ -26,7 +26,7 @@ print('Start telegram bot...')
 
 
 state_storage = StateMemoryStorage()
-TOKEN = '8154783971:AAES0X7dPAXy2chPl1RCMlbBqI2ihQhEAUk'
+TOKEN = ''
 bot = TeleBot(TOKEN, state_storage=state_storage, skip_pending=True)
 
 
